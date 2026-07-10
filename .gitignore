@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+.venv/
+
+# Airflow
+airflow.db
+airflow-webserver.pid
+logs/
+*.log
+
+# Docker
+*.pid
+
+# Data générée à l'exécution
+data/errors.csv
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
