@@ -1,3 +1,14 @@
+"""
+DAG : ecommerce_sales_pipeline
+
+Pipeline d'analyse des ventes e-commerce : detection du fichier source,
+controle qualite, calcul des indicateurs metier, analyse par categorie,
+generation d'un rapport et stockage dans MongoDB.
+
+Les chemins de fichiers et l'URI MongoDB sont lus depuis des variables
+d'environnement pour rester portables entre l'execution locale et Docker.
+"""
+
 import os
 import json
 import logging
@@ -10,6 +21,8 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator, BranchPythonOperator
 from airflow.sensors.filesystem import FileSensor
 from airflow.utils.trigger_rule import TriggerRule
+
+from scripts.pipeline_logic import filter_valid_rows, compute_kpis, analyze_category as analyze_category_logic
 
 logger = logging.getLogger(__name__)
 
@@ -96,14 +109,7 @@ def check_data_quality(**context):
 
     df = pd.read_csv(INPUT_FILE)
 
-    invalid_mask = (
-        df["ID_Commande"].isna()
-        | (df["Montant"] < 0)
-        | (df["Quantite"] <= 0)
-    )
-
-    valid_df = df[~invalid_mask].copy()
-    invalid_df = df[invalid_mask].copy()
+    valid_df, invalid_df = filter_valid_rows(df)
 
     valid_df.to_csv(CLEAN_FILE, index=False, encoding="utf-8")
     invalid_df.to_csv(ERROR_FILE, index=False, encoding="utf-8")
@@ -146,10 +152,7 @@ def load_data(**context):
 def compute_global_kpis(**context):
     df = pd.read_csv(CLEAN_FILE)
 
-    nb_commandes = int(df["ID_Commande"].nunique())
-    nb_clients = int(df["Client"].nunique())
-    chiffre_affaires = float(df["Montant"].sum())
-    panier_moyen = round(chiffre_affaires / nb_commandes, 2) if nb_commandes else 0.0
+    global_metrics = compute_kpis(df)
 
     top_products = (
         df.groupby("Produit")
@@ -177,13 +180,6 @@ def compute_global_kpis(**context):
         .to_dict("records")
     )
 
-    global_metrics = {
-        "nb_commandes": nb_commandes,
-        "nb_clients": nb_clients,
-        "chiffre_affaires": round(chiffre_affaires, 2),
-        "panier_moyen": panier_moyen,
-    }
-
     ti = context["ti"]
     ti.xcom_push(key="global_metrics", value=global_metrics)
     ti.xcom_push(key="top_products", value=top_products)
@@ -197,13 +193,7 @@ def compute_global_kpis(**context):
 # ---------------------------------------------------------------------------
 def analyze_category(category: str, **context):
     df = pd.read_csv(CLEAN_FILE)
-    subset = df[df["Categorie"] == category]
-
-    result = {
-        "category": category,
-        "orders": int(subset["ID_Commande"].nunique()),
-        "revenue": round(float(subset["Montant"].sum()), 2),
-    }
+    result = analyze_category_logic(df, category)
     context["ti"].xcom_push(key=f"category_{category}", value=result)
     logger.info("Categorie %s : %s", category, result)
 

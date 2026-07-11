@@ -1,4 +1,10 @@
-apache-airflow==2.9.3
-pymongo==4.7.2
-pandas==2.2.2
-pytest==8.2.0
+# Dependances pour le developpement local et le conteneur Jenkins.
+# NB : apache-airflow n'est volontairement PAS ici : il vient de l'image
+# Docker officielle apache/airflow (voir docker/Dockerfile.airflow), qui
+# gere elle-meme sa propre compatibilite de versions. Le pip installer en
+# plus ici causerait exactement le conflit de versions rencontre au debut
+# du projet (Python local trop recent / incompatible).
+pandas
+pymongo
+openpyxl
+pytest
