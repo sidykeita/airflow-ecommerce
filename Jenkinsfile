@@ -54,14 +54,14 @@ pipeline {
                          -H "Content-Type: application/json" -d "{}"
 
                     echo "Attente de la fin d'execution du DAG..."
-                    sleep 60
+                    sleep 90
                 '''
             }
         }
 
         stage('Verify MongoDB') {
             steps {
-                sh 'python3 scripts/check_mongodb.py --dag-id ${DAG_ID} --max-age-minutes 10'
+                sh 'python3 scripts/check_mongodb.py --dag-id ${DAG_ID} --max-age-minutes 5'
             }
         }
     }
